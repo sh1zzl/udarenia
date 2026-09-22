@@ -181,6 +181,60 @@
     text-align:center;
     margin-top:14px;
   }
+  .mistakes-section{
+    margin-top:36px;
+    padding-top:22px;
+    border-top:1px solid var(--border);
+  }
+  .mistakes-title{
+    font-family:system-ui,-apple-system,sans-serif;
+    font-size:1rem;
+    color:var(--muted);
+    margin:0 0 12px;
+    font-weight:600;
+  }
+  .mistakes-list{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .mistake-chip{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:8px 12px;
+    font-size:1.05rem;
+  }
+  .mistake-chip .stressed{
+    color:var(--accent2);
+    font-weight:700;
+  }
+  .mistake-chip .prefix-chip{
+    color:var(--muted);
+    font-size:.8rem;
+    font-family:system-ui,-apple-system,sans-serif;
+    margin-right:3px;
+  }
+  .toolbar{
+    display:flex;
+    justify-content:flex-end;
+    gap:8px;
+    margin-bottom:10px;
+  }
+  .icon-btn{
+    background:transparent;
+    border:1px solid var(--border);
+    color:var(--muted);
+    border-radius:10px;
+    padding:6px 10px;
+    font-size:.85rem;
+    font-family:system-ui,-apple-system,sans-serif;
+    cursor:pointer;
+  }
+  .icon-btn.active{
+    color:var(--accent);
+    border-color:var(--accent);
+  }
 </style>
 </head>
 <body>
@@ -202,6 +256,12 @@
       <button class="next" id="nextBtn">Дальше →</button>
     </div>
     <div class="hint">Нажми на гласную букву, которая, по-твоему, ударная</div>
+  </div>
+
+  <div class="mistakes-section" id="mistakesSection" style="display:none;">
+    <h2 class="mistakes-title">Слова, где была ошибка</h2>
+    <div class="mistakes-list" id="mistakesList"></div>
+    <button class="restart" id="repeatMistakesBtn" style="width:100%;margin-top:12px;">🔁 Повторить только эти слова</button>
   </div>
 </div>
 
@@ -257,6 +317,50 @@ let deck = [];
 let pos = 0;
 let correctCount = 0;
 let answered = false;
+let mistakes = []; // array of original RAW_WORDS entries answered incorrectly (deduped)
+let reviewMode = false;
+
+function entryKey(entry){
+  return (typeof entry === "object") ? (entry.p + "|" + entry.w) : entry;
+}
+
+function addMistake(entry){
+  const key = entryKey(entry);
+  if(!mistakes.some(m => entryKey(m) === key)){
+    mistakes.push(entry);
+  }
+  renderMistakes();
+}
+
+function removeMistake(entry){
+  const key = entryKey(entry);
+  mistakes = mistakes.filter(m => entryKey(m) !== key);
+  renderMistakes();
+}
+
+function renderMistakes(){
+  const section = document.getElementById("mistakesSection");
+  const list = document.getElementById("mistakesList");
+  if(mistakes.length === 0){
+    section.style.display = "none";
+    return;
+  }
+  section.style.display = "block";
+  list.innerHTML = "";
+  mistakes.forEach(entry => {
+    const item = parse(entry);
+    const chip = document.createElement("span");
+    chip.className = "mistake-chip";
+    let html = "";
+    if(item.prefix){ html += '<span class="prefix-chip">(' + item.prefix + ')</span>'; }
+    for(let i=0;i<item.clean.length;i++){
+      const ch = item.clean[i];
+      html += (i === item.stressIndex) ? '<span class="stressed">' + ch + '</span>' : ch;
+    }
+    chip.innerHTML = html;
+    list.appendChild(chip);
+  });
+}
 
 function shuffle(arr){
   const a = arr.slice();
@@ -268,7 +372,19 @@ function shuffle(arr){
 }
 
 function buildDeck(){
+  reviewMode = false;
   deck = shuffle(RAW_WORDS);
+  pos = 0;
+  correctCount = 0;
+  answered = false;
+  renderStats();
+  renderCard();
+}
+
+function buildMistakesDeck(){
+  if(mistakes.length === 0) return;
+  reviewMode = true;
+  deck = shuffle(mistakes);
   pos = 0;
   correctCount = 0;
   answered = false;
@@ -291,10 +407,14 @@ function renderCard(){
   feedback.className = "feedback";
 
   if(pos >= deck.length){
+    const extraBtn = (reviewMode && mistakes.length > 0)
+      ? '<button class="restart" id="againMistakesBtn" style="flex:1">🔁 Ещё раз ошибки (' + mistakes.length + ')</button>'
+      : '';
     document.getElementById("quizArea").innerHTML =
       '<div class="card done"><h2>Готово! 🎉</h2><p>Правильно: ' + correctCount + ' из ' + deck.length + '</p>' +
-      '<div class="controls"><button class="restart" id="againBtn" style="flex:1">🔁 Пройти ещё раз</button></div></div>';
+      '<div class="controls">' + extraBtn + '<button class="restart" id="againBtn" style="flex:1">🔁 Все слова заново</button></div></div>';
     document.getElementById("againBtn").addEventListener("click", buildDeck);
+    if(extraBtn){ document.getElementById("againMistakesBtn").addEventListener("click", buildMistakesDeck); }
     return;
   }
 
@@ -336,13 +456,16 @@ function handleAnswer(clickedIndex, correctIndex, wordEl){
   });
 
   const feedback = document.getElementById("feedback");
+  const currentEntry = deck[pos - 1];
   if(clickedIndex === correctIndex){
     correctCount++;
     feedback.textContent = "Кайф! 🔥";
     feedback.className = "feedback ok";
+    if(reviewMode){ removeMistake(currentEntry); }
   } else {
     feedback.textContent = "Не в этот раз — правильно выделено зелёным";
     feedback.className = "feedback bad";
+    addMistake(currentEntry);
   }
 
   renderStats();
@@ -351,8 +474,10 @@ function handleAnswer(clickedIndex, correctIndex, wordEl){
 
 document.getElementById("nextBtn").addEventListener("click", renderCard);
 document.getElementById("shuffleBtn").addEventListener("click", buildDeck);
+document.getElementById("repeatMistakesBtn").addEventListener("click", buildMistakesDeck);
 
 buildDeck();
+renderMistakes();
 </script>
 </body>
 </html>
