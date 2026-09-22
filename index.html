@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Тренажёр ударений</title>
+<style>
+  :root{
+    --bg:#faf7f2;
+    --card:#ffffff;
+    --text:#2b2620;
+    --muted:#8a8378;
+    --accent:#c9622a;
+    --accent2:#3a7d5c;
+    --wrong:#c0392b;
+    --border:#e7e0d4;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#1b1815;
+      --card:#242019;
+      --text:#f1ece2;
+      --muted:#a89e8e;
+      --accent:#e07b3f;
+      --accent2:#4fae82;
+      --wrong:#e0554a;
+      --border:#38322a;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#1b1815;
+    --card:#242019;
+    --text:#f1ece2;
+    --muted:#a89e8e;
+    --accent:#e07b3f;
+    --accent2:#4fae82;
+    --wrong:#e0554a;
+    --border:#38322a;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-padding-top:env(safe-area-inset-top,0px);}
+  body{
+    margin:0;
+    min-height:100%;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Georgia','Times New Roman',serif;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+    display:flex;
+    justify-content:center;
+  }
+  .wrap{
+    width:100%;
+    max-width:640px;
+    padding:24px 18px 60px;
+  }
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    margin-bottom:18px;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  h1{
+    font-size:1.3rem;
+    margin:0;
+    font-weight:700;
+    letter-spacing:.2px;
+  }
+  .stats{
+    font-family:system-ui,-apple-system,sans-serif;
+    font-size:.85rem;
+    color:var(--muted);
+  }
+  .progress-bar{
+    height:5px;
+    background:var(--border);
+    border-radius:4px;
+    overflow:hidden;
+    margin-bottom:26px;
+  }
+  .progress-fill{
+    height:100%;
+    background:var(--accent2);
+    width:0%;
+    transition:width .25s ease;
+  }
+  .card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:18px;
+    padding:38px 22px;
+    text-align:center;
+    box-shadow:0 2px 14px rgba(0,0,0,.06);
+    min-height:190px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    gap:10px;
+  }
+  .prefix{
+    font-family:system-ui,-apple-system,sans-serif;
+    color:var(--muted);
+    font-size:1rem;
+  }
+  .word{
+    font-size:2.3rem;
+    line-height:1.3;
+    letter-spacing:.5px;
+    word-break:break-word;
+  }
+  .vowel{
+    cursor:pointer;
+    padding:0 1px;
+    border-radius:6px;
+    transition:background .15s, color .15s;
+  }
+  .vowel:hover{ background:rgba(201,98,42,.14); }
+  .vowel.correct{
+    color:var(--accent2);
+    font-weight:700;
+    background:rgba(58,125,92,.16);
+  }
+  .vowel.wrong{
+    color:var(--wrong);
+    font-weight:700;
+    background:rgba(192,57,43,.14);
+    text-decoration:line-through;
+  }
+  .vowel.disabled{ cursor:default; }
+  .feedback{
+    min-height:1.6rem;
+    font-family:system-ui,-apple-system,sans-serif;
+    font-size:1.05rem;
+    font-weight:600;
+  }
+  .feedback.ok{ color:var(--accent2); }
+  .feedback.bad{ color:var(--wrong); }
+  .controls{
+    display:flex;
+    gap:10px;
+    margin-top:22px;
+  }
+  button.next, button.restart{
+    flex:1;
+    font-family:system-ui,-apple-system,sans-serif;
+    font-size:1rem;
+    font-weight:600;
+    padding:13px 16px;
+    border-radius:12px;
+    border:none;
+    cursor:pointer;
+    transition:opacity .15s, transform .05s;
+  }
+  button.next{
+    background:var(--accent);
+    color:#fff;
+    opacity:0;
+    pointer-events:none;
+  }
+  button.next.show{ opacity:1; pointer-events:auto; }
+  button.next:active{ transform:scale(.98); }
+  button.restart{
+    background:transparent;
+    color:var(--muted);
+    border:1px solid var(--border);
+    flex:0 0 auto;
+  }
+  .done{
+    text-align:center;
+    padding:40px 10px;
+  }
+  .done h2{ font-family:system-ui,-apple-system,sans-serif; }
+  .hint{
+    font-family:system-ui,-apple-system,sans-serif;
+    font-size:.8rem;
+    color:var(--muted);
+    text-align:center;
+    margin-top:14px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Тренажёр ударений</h1>
+    <div class="stats" id="stats">0 / 0 · верно 0</div>
+  </header>
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+
+  <div id="quizArea">
+    <div class="card" id="card">
+      <div class="prefix" id="prefix"></div>
+      <div class="word" id="word"></div>
+      <div class="feedback" id="feedback"></div>
+    </div>
+    <div class="controls">
+      <button class="restart" id="shuffleBtn" title="Перемешать и начать заново">🔀 Заново</button>
+      <button class="next" id="nextBtn">Дальше →</button>
+    </div>
+    <div class="hint">Нажми на гласную букву, которая, по-твоему, ударная</div>
+  </div>
+</div>
+
+<script>
+// Каждое слово: ударная гласная помечена сразу за собой символом U+0301 (комбинирующее ударение).
+// Если в слове есть буква "ё" — она считается ударной автоматически (даже без метки).
+const RAW_WORDS = [
+"асимметри\u0301я","апостро\u0301ф",{p:"в",w:"аэропорту\u0301"},"афе\u0301ра",
+"базили\u0301к",{p:"из",w:"Балаши\u0301хи"},{p:"на",w:"Ба\u0301ли"},"балова\u0301ть","ба\u0301мперы","ба\u0301нты","ба\u0301рмен","бла\u0301га","блю\u0301да","бо\u0301чковый","булгу\u0301р","бухга\u0301лтеры",
+"вероиспове\u0301дание","ветерина\u0301рия","вёшенки","включённый","включа\u0301т","возбуждённый",{p:"от",w:"возрасто\u0301в"},"во\u0301зрасты","ворвала\u0301сь","восприня\u0301ть","вручи\u0301т","втридоро\u0301га",
+"газопрово\u0301д","гастроно\u0301мия","ге\u0301незис","гербы\u0301",{p:"в",w:"Го\u0301а"},"глясе\u0301","головёшка","гофри\u0301рованный","граффи\u0301ти","гру\u0301шевый",
+"дио\u0301птрия",{p:"с",w:"деньга\u0301ми"},"директора\u0301","диспансе\u0301р","добела\u0301","до\u0301верху","до\u0301гмат","догово\u0301р","долби\u0301шь","доне\u0301льзя","до\u0301чиста","дремо\u0301та",
+"жалюзи\u0301","жёлоб",
+"зави\u0301дно","заглуши\u0301т","заём","заждался\u0301","заключи\u0301шь","закрепи\u0301т","заперла\u0301","запле\u0301сневел","запломбирова\u0301ть","заржаве\u0301ть","за\u0301темно","зна\u0301мение",
+"ико\u0301нопись",
+"кварта\u0301л","катало\u0301г","каучу\u0301к","кашляну\u0301ть","краси\u0301вее",{p:"к",w:"деньга\u0301м"},"креме\u0301нь",
+"марке\u0301тинговый","мо\u0301рит",
+"назвала\u0301","наме\u0301рения",
+"прида\u0301ное","премиро\u0301ванный","пригово\u0301р","прину\u0301дить","прибы\u0301вший","плодоноси\u0301ть","плодоно\u0301сит","плодоно\u0301сят","подня\u0301ть","по\u0301днял","подняла\u0301","по\u0301дняло","поми\u0301нки",
+"со\u0301гнутый","со\u0301зыв","сли\u0301вовый","сре\u0301дства","сироты\u0301","свёкла",{p:"с",w:"то\u0301ртами"},"созда\u0301ть","со\u0301здал","со\u0301здали","со\u0301здан","создана\u0301",
+"ободри\u0301ть","опо\u0301шлить","облегчи\u0301ть","опто\u0301вый","углуби\u0301ть","уме\u0301рший",
+"феноме\u0301н",
+"хода\u0301тайствовать","хозя\u0301ева",
+"экспе\u0301рт",
+"уве\u0301домить","уве\u0301домленный","уве\u0301домлен","уве\u0301домлена","уве\u0301домлены"
+];
+
+const VOWELS = "аеёиоуыэюя";
+function isVowel(ch){ return VOWELS.indexOf(ch.toLowerCase()) !== -1; }
+
+function parse(entry){
+  const prefix = (typeof entry === "object") ? entry.p : null;
+  const raw = (typeof entry === "object") ? entry.w : entry;
+  let clean = "";
+  let stressIndexInClean = -1; // index within 'clean' string of stressed letter
+  for(let i=0;i<raw.length;i++){
+    const ch = raw[i];
+    if(ch === "\u0301"){ continue; }
+    clean += ch;
+    const nextIsMark = raw[i+1] === "\u0301";
+    if(nextIsMark){ stressIndexInClean = clean.length - 1; }
+  }
+  if(stressIndexInClean === -1){
+    // fall back: ё is always stressed
+    const yoIdx = clean.indexOf("ё");
+    const YoIdx = clean.indexOf("Ё");
+    stressIndexInClean = yoIdx !== -1 ? yoIdx : YoIdx;
+  }
+  return { prefix, clean, stressIndex: stressIndexInClean };
+}
+
+let deck = [];
+let pos = 0;
+let correctCount = 0;
+let answered = false;
+
+function shuffle(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+function buildDeck(){
+  deck = shuffle(RAW_WORDS);
+  pos = 0;
+  correctCount = 0;
+  answered = false;
+  renderStats();
+  renderCard();
+}
+
+function renderStats(){
+  document.getElementById("stats").textContent =
+    Math.min(pos, deck.length) + " / " + deck.length + " · верно " + correctCount;
+  const pct = deck.length ? (pos/deck.length)*100 : 0;
+  document.getElementById("progressFill").style.width = pct + "%";
+}
+
+function renderCard(){
+  answered = false;
+  document.getElementById("nextBtn").classList.remove("show");
+  const feedback = document.getElementById("feedback");
+  feedback.textContent = "";
+  feedback.className = "feedback";
+
+  if(pos >= deck.length){
+    document.getElementById("quizArea").innerHTML =
+      '<div class="card done"><h2>Готово! 🎉</h2><p>Правильно: ' + correctCount + ' из ' + deck.length + '</p>' +
+      '<div class="controls"><button class="restart" id="againBtn" style="flex:1">🔁 Пройти ещё раз</button></div></div>';
+    document.getElementById("againBtn").addEventListener("click", buildDeck);
+    return;
+  }
+
+  const item = parse(deck[pos]);
+  const prefixEl = document.getElementById("prefix");
+  prefixEl.textContent = item.prefix ? "(" + item.prefix + ")" : "";
+
+  const wordEl = document.getElementById("word");
+  wordEl.innerHTML = "";
+  for(let i=0;i<item.clean.length;i++){
+    const ch = item.clean[i];
+    if(isVowel(ch)){
+      const span = document.createElement("span");
+      span.className = "vowel";
+      span.textContent = ch;
+      span.dataset.index = i;
+      span.addEventListener("click", () => handleAnswer(i, item.stressIndex, wordEl));
+      wordEl.appendChild(span);
+    } else {
+      wordEl.appendChild(document.createTextNode(ch));
+    }
+  }
+}
+
+function handleAnswer(clickedIndex, correctIndex, wordEl){
+  if(answered) return;
+  answered = true;
+  pos++;
+
+  const spans = wordEl.querySelectorAll(".vowel");
+  spans.forEach(s => {
+    s.classList.add("disabled");
+    const idx = parseInt(s.dataset.index, 10);
+    if(idx === correctIndex){
+      s.classList.add("correct");
+    } else if(idx === clickedIndex){
+      s.classList.add("wrong");
+    }
+  });
+
+  const feedback = document.getElementById("feedback");
+  if(clickedIndex === correctIndex){
+    correctCount++;
+    feedback.textContent = "Кайф! 🔥";
+    feedback.className = "feedback ok";
+  } else {
+    feedback.textContent = "Не в этот раз — правильно выделено зелёным";
+    feedback.className = "feedback bad";
+  }
+
+  renderStats();
+  document.getElementById("nextBtn").classList.add("show");
+}
+
+document.getElementById("nextBtn").addEventListener("click", renderCard);
+document.getElementById("shuffleBtn").addEventListener("click", buildDeck);
+
+buildDeck();
+</script>
+</body>
+</html>
